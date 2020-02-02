@@ -5,21 +5,22 @@ using UnityEngine.UI;
 
 public class Game : MonoBehaviour
 {
-    public Text playerTotal, computerTotal;
-    public Text playerCatch, computerCatch;
+    public Text playerTotal, computerTotal, totalSelect;
+    public Text playerCatch, computerCatch, selected;
     public Text end;
     public bool isPlayerSelecting;
     
     // Start is called before the first frame update
     void Start()
     {
-        Model.Instance = new Model();
+        if(Model.Instance == null) Model.Instance = new Model();
+        Model.Instance.game = this;
         Model.Instance.Init();
         
-        Controller.Instance = new Controller();
+        if(Controller.Instance == null) Controller.Instance = new Controller();
         Controller.Instance.game = this;
         
-        View.Instance = new View();
+        if(View.Instance == null) View.Instance = new View();
         View.Instance.game = this;
         View.Instance.Init();
 
@@ -29,7 +30,8 @@ public class Game : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Controller.Instance.Update();
+        if(isPlayerSelecting) Controller.Instance.SelectUpdate(); 
+        else Controller.Instance.GameUpdate();
     }
 
     public void Restart()

@@ -6,6 +6,7 @@ using UnityEngine.XR.WSA;
 public class Model
 {
     public static Model Instance;
+    public Game game;
     private bool isPlayerTurn = true;
     public enum mapPiece
     {
@@ -23,7 +24,8 @@ public class Model
 
     public win winingSituation = win.onGoing;
     public static Vector2Int mapSize = new Vector2Int(9,5);
-    
+
+    public int selectedShipNum = 0;
     public int shipNumber = 15;
     
     public mapPiece[,] computerMap = new mapPiece[mapSize.x,mapSize.y], playerMap = new mapPiece[mapSize.x,mapSize.y];
@@ -35,12 +37,30 @@ public class Model
         _InitCheckMap(playerPieceCheckMap);
         _InitCheckMap(computePieceCheckMap);
         //init the ship map for player
-        _InitPlayerBoard();
         _InitComputerBoard();
+        _InitPlayerBoard();
 
         winingSituation = win.onGoing;
+        selectedShipNum = 0;
     }
-    
+
+    public void DoMapSelect(Vector2Int pos)
+    {
+        if(!_isInMap(pos)) return;
+        
+        if(playerMap[pos.x,pos.y] == mapPiece.Ship) return;
+
+        playerMap[pos.x, pos.y] = mapPiece.Ship;
+        selectedShipNum++;
+
+        View.Instance.DoSelectViewUpdate();
+
+        if (selectedShipNum == shipNumber)
+        {
+            game.isPlayerSelecting = false;
+            View.Instance.GameStartViewUpdate();
+        }
+    }
     public void DoMapCheck(Vector2Int pos)
     {
         pos.y -= Model.mapSize.y;
@@ -82,7 +102,7 @@ public class Model
         if (playerMap[pos.x, pos.y] == mapPiece.Ship) catchedPlayerShip++;
     }
 
-    private void _InitPlayerBoard()
+    private void _InitComputerBoard()
     {
         List<Vector2Int> posList = new List<Vector2Int>();
         for (int x = 0; x < Model.mapSize.x; x++)
@@ -101,22 +121,15 @@ public class Model
         }
     }
 
-    private void _InitComputerBoard()
+    private void _InitPlayerBoard()
     {
         List<Vector2Int> posList = new List<Vector2Int>();
         for (int x = 0; x < Model.mapSize.x; x++)
         {
             for (int y = 0; y < Model.mapSize.y; y++)
             {
-                posList.Add(new Vector2Int(x,y));
+                playerMap[x,y] = mapPiece.Empty;
             }
-        }
-        
-        posList = _Shuffle(posList);
-        
-        for (int i = 0; i < shipNumber; i++)
-        {
-            playerMap[posList[i].x, posList[i].y] = mapPiece.Ship;
         }
     }
 
