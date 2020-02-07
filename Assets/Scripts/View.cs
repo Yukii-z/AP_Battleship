@@ -2,10 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public class View
 {
-    public Game game;
+    public ApplicationIntegration applicationIntegration;
     public static View Instance;
     private GameObject ExistShipCheckMark;
     private GameObject NonExistShipCheckMark;
@@ -19,13 +20,13 @@ public class View
         _InitLine();
         _InitBoard();
 
-        game.computerTotal.text = Model.Instance.shipNumber.ToString();
-        game.playerTotal.text = Model.Instance.shipNumber.ToString();
-        game.totalSelect.text = Model.Instance.shipNumber.ToString();
-        game.playerCatch.text = "00";
-        game.computerCatch.text = "00";
-        game.selected.text = "00";
-        game.end.text = String.Empty;
+        applicationIntegration.computerTotal.text = Model.Instance.totalShipNumber.ToString();
+        applicationIntegration.playerTotal.text = Model.Instance.totalShipNumber.ToString();
+        applicationIntegration.totalSelect.text = Model.Instance.totalShipNumber.ToString();
+        applicationIntegration.playerCatch.text = "00";
+        applicationIntegration.computerCatch.text = "00";
+        applicationIntegration.selected.text = "00";
+        applicationIntegration.end.text = String.Empty;
     }
 
     public void GameStartViewUpdate()
@@ -34,7 +35,7 @@ public class View
         {
             for (int y = 0; y < Model.mapSize.y; y++)
             {
-                //for player board
+                //for PlayerWin board
                 var obj = computerPieceObj[x, y];
                 var color = obj.GetComponent<SpriteRenderer>().color;
                 color.a = 0.1f;
@@ -43,63 +44,84 @@ public class View
             }
         }
     }
+    
     public void DoViewUpdate()
     {
-        for (int x = 0; x < Model.mapSize.x; x++)
+        switch (Model.Instance.currentState)
         {
-            for (int y = 0; y < Model.mapSize.y; y++)
-            {
-                //for player board
-                var mapPiece = Model.Instance.computerMap[x, y];
-                var checkPiece = Model.Instance.playerPieceCheckMap[x, y];
-                if (checkPiece)
-                {
-                    var obj = playerPieceObj[x, y];
-                    GameObject.Destroy(obj);
-                    playerPieceObj[x,y] = GameObject.Instantiate(mapPiece == Model.mapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);
-                    playerPieceObj[x,y].transform.position = new Vector3(x,y + Model.mapSize.y,0);
-                    
-                }
-                
-                //computer board
-                mapPiece = Model.Instance.playerMap[x, y];
-                checkPiece = Model.Instance.computePieceCheckMap[x, y];
-                if (checkPiece)
-                {
-                    var obj = computerPieceObj[x, y];
-                    GameObject.Destroy(obj);
-                    computerPieceObj[x, y] = GameObject.Instantiate(mapPiece == Model.mapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);
-                    computerPieceObj[x, y].transform.position = new Vector3(x,y,0);
-                    
-                }
-            }
+            case Model.GameState.PlacingPieces:
+            case Model.GameState.OnGoing:
+            case Model.GameState.WaitingForAITurn:
+                _OngoingGameUpdate();
+                break;
+            case Model.GameState.Tie:
+            case Model.GameState.ComputerWin:
+            case Model.GameState.PlayerWin:
+                _GameOverUpdate();
+                break;
         }
-
-        game.playerCatch.text = Model.Instance.catchedComputerShip.ToString();
-        game.computerCatch.text = Model.Instance.catchedPlayerShip.ToString();
-
-        if (Model.Instance.winingSituation != Model.win.onGoing)
-        {
-            game.end.text = Model.Instance.winingSituation == Model.win.computer ? "You Lose!" : "You Win!";
-            if (Model.Instance.winingSituation == Model.win.tie) game.end.text = "It's a tie!";
-        }
+        
     }
 
+    private void _GameOverUpdate()
+    {
+        applicationIntegration.end.text = Model.Instance.currentState == Model.GameState.ComputerWin ? "You Lose!" : "You Win!";
+        if (Model.Instance.currentState == Model.GameState.Tie) applicationIntegration.end.text = "It's a Tie!";
+
+    }
+    
     public void DoSelectViewUpdate()
     {
         for (int x = 0; x < Model.mapSize.x; x++)
         {
             for (int y = 0; y < Model.mapSize.y; y++)
             {
-                //for player board
+                //for PlayerWin board
                 var obj = computerPieceObj[x, y];
                 if(obj) GameObject.Destroy(obj);
-                computerPieceObj[x, y] = GameObject.Instantiate(Model.Instance.playerMap[x,y]== Model.mapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);;
+                computerPieceObj[x, y] = GameObject.Instantiate(Model.Instance.playerMap[x,y].pieceType== Model.MapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);;
                 computerPieceObj[x, y].transform.position = new Vector3(x, y, 0);
             }
         }
         
-        game.selected.text = Model.Instance.selectedShipNum.ToString();
+        applicationIntegration.selected.text = Model.Instance.placedShipNumber.ToString();
+    }
+
+    private void _OngoingGameUpdate()
+    {
+        
+        for (int x = 0; x < Model.mapSize.x; x++)
+        {
+            for (int y = 0; y < Model.mapSize.y; y++)
+            {
+                //for PlayerWin board
+                var mapPiece = Model.Instance.computerMap[x, y].pieceType;
+                var checkPiece = Model.Instance.playerMap[x, y].hasBeenSelected;
+                if (checkPiece)
+                {
+                    var obj = playerPieceObj[x, y];
+                    Object.Destroy(obj);
+                    playerPieceObj[x,y] = Object.Instantiate(mapPiece == Model.MapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);
+                    playerPieceObj[x,y].transform.position = new Vector3(x,y + Model.mapSize.y,0);
+                    
+                }
+                
+                //ComputerWin board
+                mapPiece = Model.Instance.playerMap[x, y].pieceType;
+                checkPiece = Model.Instance.computerMap[x, y].hasBeenSelected;
+                if (checkPiece)
+                {
+                    var obj = computerPieceObj[x, y];
+                    Object.Destroy(obj);
+                    computerPieceObj[x, y] = Object.Instantiate(mapPiece == Model.MapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);
+                    computerPieceObj[x, y].transform.position = new Vector3(x,y,0);
+                    
+                }
+            }
+        }
+
+        applicationIntegration.playerCatch.text = Model.Instance.capturedComputerShip.ToString();
+        applicationIntegration.computerCatch.text = Model.Instance.capturedPlayerShips.ToString();
     }
 
     private void _InitLine()
@@ -118,13 +140,13 @@ public class View
         {
             for (int y = 0; y < Model.mapSize.y; y++)
             {
-                //for player board
+                //for PlayerWin board
                 var obj = computerPieceObj[x, y];
                 if(obj) GameObject.Destroy(obj);
                 computerPieceObj[x, y] = GameObject.Instantiate(NonExistShipCheckMark);
                 computerPieceObj[x, y].transform.position = new Vector3(x, y, 0);
                 
-                //for computer board
+                //for ComputerWin board
                 obj = playerPieceObj[x, y];
                 if (obj)
                 {

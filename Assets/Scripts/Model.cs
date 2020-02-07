@@ -6,68 +6,76 @@ using UnityEngine.XR.WSA;
 public class Model
 {
     public static Model Instance;
-    public Game game;
+    public ApplicationIntegration applicationIntegration;
+    
     private bool isPlayerTurn = true;
-    public enum mapPiece
+    
+    public enum MapPiece
     {
         Empty,
         Ship
     }
 
-    public enum win
+    public struct GridSpace
     {
-        onGoing,
-        player,
-        computer,
-        tie,
+        public MapPiece pieceType;
+        public bool hasBeenSelected;
     }
 
-    public win winingSituation = win.onGoing;
+    public enum GameState
+    {
+        WaitingForAITurn,
+        PlacingPieces,
+        OnGoing,
+        PlayerWin,
+        ComputerWin,
+        Tie,
+    }
+
+    public GameState currentState = GameState.OnGoing;
     public static Vector2Int mapSize = new Vector2Int(9,5);
 
-    public int selectedShipNum = 0;
-    public int shipNumber = 15;
+    public int placedShipNumber = 0;
+    public int totalShipNumber = 15;
     
-    public mapPiece[,] computerMap = new mapPiece[mapSize.x,mapSize.y], playerMap = new mapPiece[mapSize.x,mapSize.y];
-    public bool[,] playerPieceCheckMap = new bool[mapSize.x,mapSize.y], computePieceCheckMap = new bool[mapSize.x,mapSize.y];
-    public int catchedPlayerShip = 0, catchedComputerShip = 0;
+    public GridSpace[,] computerMap = new GridSpace[mapSize.x,mapSize.y], playerMap = new GridSpace[mapSize.x,mapSize.y];
+    
+    public int capturedPlayerShips = 0, capturedComputerShip = 0;
 
     public void Init()
     {
-        _InitCheckMap(playerPieceCheckMap);
-        _InitCheckMap(computePieceCheckMap);
-        //init the ship map for player
+        //init the ship map for PlayerWin
         _InitComputerBoard();
         _InitPlayerBoard();
 
-        winingSituation = win.onGoing;
-        selectedShipNum = 0;
+        currentState = GameState.PlacingPieces;
+        placedShipNumber = 0;
     }
 
-    public void DoMapSelect(Vector2Int pos)
+    public void PlacingShipAtPosition(Vector2Int pos)
     {
         if(!_isInMap(pos)) return;
         
-        if(playerMap[pos.x,pos.y] == mapPiece.Ship) return;
+        if(playerMap[pos.x,pos.y].pieceType == MapPiece.Ship) return;
 
-        playerMap[pos.x, pos.y] = mapPiece.Ship;
-        selectedShipNum++;
+        playerMap[pos.x, pos.y].pieceType = MapPiece.Ship;
+        placedShipNumber++;
 
         View.Instance.DoSelectViewUpdate();
 
-        if (selectedShipNum == shipNumber)
-        {
-            game.isPlayerSelecting = false;
-            View.Instance.GameStartViewUpdate();
-        }
+        if (placedShipNumber != totalShipNumber) return;
+        
+        currentState = GameState.OnGoing;
+        View.Instance.GameStartViewUpdate();
     }
     public void DoMapCheck(Vector2Int pos)
     {
         pos.y -= Model.mapSize.y;
-        if(!_isInMap(pos) || playerPieceCheckMap[pos.x, pos.y]) return;
+        if(!_isInMap(pos) || playerMap[pos.x, pos.y].hasBeenSelected) return;
         
-        playerPieceCheckMap[pos.x, pos.y] = true;
-        if (computerMap[pos.x, pos.y] == mapPiece.Ship) catchedComputerShip++;
+        playerMap[pos.x, pos.y].hasBeenSelected = true;
+        if (computerMap[pos.x, pos.y].pieceType == MapPiece.Ship) 
+            capturedComputerShip++;
         
         isPlayerTurn = !isPlayerTurn;
         if (!isPlayerTurn)
@@ -78,9 +86,9 @@ public class Model
 
         if (_IsGameEnd())
         {
-            //game end
-            winingSituation = catchedComputerShip >= shipNumber ? win.player : win.computer;
-            if (catchedComputerShip == catchedPlayerShip) winingSituation = win.tie;
+            //applicationIntegration end
+            currentState = capturedComputerShip >= totalShipNumber ? GameState.PlayerWin : GameState.ComputerWin;
+            if (capturedComputerShip == capturedPlayerShips) currentState = GameState.Tie;
         } 
         
         View.Instance.DoViewUpdate();
@@ -88,7 +96,7 @@ public class Model
 
     private bool _IsGameEnd()
     {
-        if (catchedComputerShip >= shipNumber || catchedPlayerShip >= shipNumber)
+        if (capturedComputerShip >= totalShipNumber || capturedPlayerShips >= totalShipNumber)
         {
             return true;
         }
@@ -97,9 +105,9 @@ public class Model
 
     private void _AIMove()
     {
-        var pos = _ramdomUnCheckedPos(computePieceCheckMap);
-        computePieceCheckMap[pos.x, pos.y] = true;
-        if (playerMap[pos.x, pos.y] == mapPiece.Ship) catchedPlayerShip++;
+        var pos = _ramdomUnCheckedPos(computerMap);
+        computerMap[pos.x, pos.y].hasBeenSelected = true;
+        if (playerMap[pos.x, pos.y].pieceType == MapPiece.Ship) capturedPlayerShips++;
     }
 
     private void _InitComputerBoard()
@@ -115,9 +123,9 @@ public class Model
         
         posList = _Shuffle(posList);
         
-        for (int i = 0; i < shipNumber; i++)
+        for (int i = 0; i < totalShipNumber; i++)
         {
-            computerMap[posList[i].x, posList[i].y] = mapPiece.Ship;
+            computerMap[posList[i].x, posList[i].y].pieceType = MapPiece.Ship;
         }
     }
 
@@ -128,27 +136,15 @@ public class Model
         {
             for (int y = 0; y < Model.mapSize.y; y++)
             {
-                playerMap[x,y] = mapPiece.Empty;
-            }
-        }
-    }
-
-    private void _InitCheckMap(bool[,] map)
-    {
-        for (int x = 0; x < Model.mapSize.x; x++)
-        {
-            for (int y = 0; y < Model.mapSize.y; y++)
-            {
-                map[x, y] = false;
+                playerMap[x,y].pieceType = MapPiece.Empty;
+                playerMap[x, y].hasBeenSelected = false;
             }
         }
     }
 
     private bool _isInMap(Vector2Int pos)
     {
-        if (pos.x < 0 || pos.x > mapSize.x-1) return false;
-        if (pos.y < 0 || pos.y > mapSize.y-1) return false;
-        return true;
+        return _isInMap(pos.x, pos.y);
     }
     
     private bool _isInMap(int x, int y)
@@ -158,20 +154,19 @@ public class Model
         return true;
     }
 
-    private Vector2Int _ramdomUnCheckedPos(bool[,] checkMap)
+    private Vector2Int _ramdomUnCheckedPos(GridSpace[,] checkMap)
     {
-        var _x = Random.Range(0f, 1f);
-        var x = (int) Mathf.Floor(_x * mapSize.x);
-        var _y = Random.Range(0f, 1f);
-        var y = (int) Mathf.Floor(_y * mapSize.y);
+        var x = -1;
+        var y = -1;
 
-        if (!_isInMap(x, y) || checkMap[x, y])
+        while (!(_isInMap(x, y) && !checkMap[x, y].hasBeenSelected))
         {
-            var pos = _ramdomUnCheckedPos(checkMap);
-            x = pos.x;
-            y = pos.y;
+            var _x = Random.Range(0f, 1f);
+            x = (int) Mathf.Floor(_x * mapSize.x);
+            var _y = Random.Range(0f, 1f);
+            y = (int) Mathf.Floor(_y * mapSize.y);
         }
-        
+
         return new Vector2Int(x,y);
     }
 
