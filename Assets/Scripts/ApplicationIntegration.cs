@@ -25,6 +25,7 @@ public class ApplicationIntegration : MonoBehaviour
     public Text playerTotal, computerTotal, totalSelect;
     public Text playerCatch, computerCatch, selected;
     public Text end;
+    public Button shipSet;
 
     private void Start()
     {

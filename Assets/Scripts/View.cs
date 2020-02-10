@@ -79,7 +79,21 @@ public class View
                 //for PlayerWin board
                 var obj = computerPieceObj[x, y];
                 if(obj) GameObject.Destroy(obj);
-                computerPieceObj[x, y] = GameObject.Instantiate(Model.Instance.playerMap[x,y].pieceType== Model.MapPiece.Ship ? ExistShipCheckMark : NonExistShipCheckMark);;
+                switch (Model.Instance.playerMap[x,y].pieceType)
+                {
+                    case Model.MapPiece.Ship:
+                        computerPieceObj[x, y] = GameObject.Instantiate(ExistShipCheckMark);
+                        break;
+                    case Model.MapPiece.PossibleShip:
+                        computerPieceObj[x, y] = GameObject.Instantiate(NonExistShipCheckMark);
+                        break;
+                    case Model.MapPiece.Empty:
+                        computerPieceObj[x, y] = GameObject.Instantiate(ExistShipCheckMark);
+                        var color = computerPieceObj[x, y].GetComponent<SpriteRenderer>().color;
+                        color.a = 0.5f;
+                        computerPieceObj[x, y].GetComponent<SpriteRenderer>().color = color;
+                        break;
+                }
                 computerPieceObj[x, y].transform.position = new Vector3(x, y, 0);
             }
         }

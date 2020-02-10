@@ -33,7 +33,7 @@ public class InputSystem
         if (!Input.GetMouseButtonDown(0)) return;
         
         var attachedMousePos = _attachedMousePos(Input.mousePosition);
-        Model.Instance.PlacingShipAtPosition(attachedMousePos);
+        //Model.Instance.PlacingShipAtPosition(attachedMousePos);
     }
 
     public void GameOverUpdate()
