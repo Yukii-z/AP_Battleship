@@ -6,7 +6,7 @@ public class OnClick : MonoBehaviour
 {
     public void Set()
     {
-        Model.Instance.SetShip();
+        Model.Instance.SetPlayerShip();
     }
 
     public void Change()

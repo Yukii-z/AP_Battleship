@@ -60,15 +60,25 @@ public class Model
         }
         
     }
-    public List<Ship> playerDock = new List<Ship>{new Ship(1,1), new Ship(1,1),new Ship(1,2), new Ship(1,3), new Ship(2,3)};
-    public List<Ship> computerDock = new List<Ship>{new Ship(1,1), new Ship(1,1),new Ship(1,2), new Ship(1,3), new Ship(2,3)};
+    public List<Ship> playerDock = new List<Ship>{new Ship(1,2), new Ship(1,2), new Ship(1,3), new Ship(2,3)};
+    public List<Ship> computerDock = new List<Ship>{new Ship(1,2), new Ship(1,2),new Ship(1,3), new Ship(2,3)};
     private Ship newShip;
     
     public GameState currentState = GameState.OnGoing;
     public static Vector2Int mapSize = new Vector2Int(9,5);
 
     public int placedShipNumber = 0;
-    public int totalShipNumber = 15;
+
+    public int totalShipNumber
+    {
+        get
+        {
+            var i = 0;
+            foreach (var ship in playerDock)
+                i += ship.x * ship.y;
+            return i;
+        }
+    }
     
     public GridSpace[,] computerMap = new GridSpace[mapSize.x,mapSize.y], playerMap = new GridSpace[mapSize.x,mapSize.y];
     
@@ -79,8 +89,6 @@ public class Model
         //init the ship map for PlayerWin
         _InitComputerBoard();
         _InitPlayerBoard();
-
-        //newShip = _RandomSelectShip(playerDock, playerMap);
 
         currentState = GameState.PlacingPieces;
         placedShipNumber = 0;
@@ -102,6 +110,7 @@ public class Model
         currentState = GameState.OnGoing;
         View.Instance.GameStartViewUpdate();
     }
+    
     public void DoMapCheck(Vector2Int pos)
     {
         pos.y -= Model.mapSize.y;
@@ -157,7 +166,10 @@ public class Model
         }
 
         while (!_isDockSet(computerDock))
-            _RandomSelectShip(computerDock, computerMap);
+        {
+            var ship = _RandomSelectShip(computerDock, computerMap);
+            _PutShipDown(ship,computerMap);
+        }
     }
 
     private void _InitPlayerBoard()
@@ -170,7 +182,8 @@ public class Model
                 playerMap[x, y].hasBeenSelected = false;
             }
         }
-        
+
+        newShip = _PickUpRandomShipForPlayer();
     }
 
     private bool _isInMap(Vector2Int pos)
@@ -243,18 +256,18 @@ public class Model
         return true;
     }
 
-    public void SetShip()
+    public void SetPlayerShip()
     {
         if(newShip == null) return;
         
-        _SetShip(newShip,playerMap,MapPiece.Ship);
+        _PutShipDown(newShip,playerMap);
         newShip = null;
-        View.Instance.DoSelectViewUpdate();
         
         if (!_isDockSet(playerDock))
         {
-             newShip = _RandomSelectShip(playerDock, playerMap);
-             return;
+            newShip = _PickUpRandomShipForPlayer();
+            View.Instance.DoSelectViewUpdate();
+            return;
         }
         
         currentState = GameState.OnGoing;
@@ -265,11 +278,19 @@ public class Model
     {
         if (_isDockSet(playerDock)) return;
         
-        newShip = _RandomSelectShip(playerDock, playerMap);
+        _SetShipToCertainState(newShip, playerMap,MapPiece.Empty);
+        newShip = _PickUpRandomShipForPlayer();
         View.Instance.DoSelectViewUpdate();
     }
+
+    private void _PutShipDown(Ship ship, GridSpace[,] map)
+    {
+        _SetShipToCertainState(ship, map, MapPiece.Ship);
+        ship.isBeenSetOnBoard = true;
+
+    }
     
-    private void _SetShip(Ship ship, GridSpace[,] map, MapPiece targetType)
+    private void _SetShipToCertainState(Ship ship, GridSpace[,] map, MapPiece targetType)
     {
         for (int x = ship.refPos.x; x < ship.refPos.x + ship.size.x; x++)
         {
@@ -292,7 +313,7 @@ public class Model
             dock[0].isBend = _ShuffleBool();
         }
 
-        _SetShip(dock[0], map, MapPiece.PossibleShip);
+        _SetShipToCertainState(dock[0], map, MapPiece.PossibleShip);
         return dock[0];
     }
 
@@ -304,5 +325,12 @@ public class Model
                 return false;
         }
         return true;
+    }
+
+    private Ship _PickUpRandomShipForPlayer()
+    {
+        var ship = _RandomSelectShip(playerDock, playerMap);
+        _SetShipToCertainState(ship,playerMap,MapPiece.PossibleShip);
+        return ship;
     }
 }

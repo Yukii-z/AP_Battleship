@@ -27,10 +27,13 @@ public class View
         applicationIntegration.computerCatch.text = "00";
         applicationIntegration.selected.text = "00";
         applicationIntegration.end.text = String.Empty;
+
+        DoSelectViewUpdate();
     }
 
     public void GameStartViewUpdate()
     {
+        DoSelectViewUpdate();
         for (int x = 0; x < Model.mapSize.x; x++)
         {
             for (int y = 0; y < Model.mapSize.y; y++)
@@ -84,10 +87,10 @@ public class View
                     case Model.MapPiece.Ship:
                         computerPieceObj[x, y] = GameObject.Instantiate(ExistShipCheckMark);
                         break;
-                    case Model.MapPiece.PossibleShip:
+                    case Model.MapPiece.Empty:
                         computerPieceObj[x, y] = GameObject.Instantiate(NonExistShipCheckMark);
                         break;
-                    case Model.MapPiece.Empty:
+                    case Model.MapPiece.PossibleShip:
                         computerPieceObj[x, y] = GameObject.Instantiate(ExistShipCheckMark);
                         var color = computerPieceObj[x, y].GetComponent<SpriteRenderer>().color;
                         color.a = 0.5f;
