@@ -312,8 +312,6 @@ public class Model
             dock[0].refPos = new Vector2Int(Random.Range(0, mapSize.x), Random.Range(0, mapSize.y));
             dock[0].isBend = _ShuffleBool();
         }
-
-        _SetShipToCertainState(dock[0], map, MapPiece.PossibleShip);
         return dock[0];
     }
 
