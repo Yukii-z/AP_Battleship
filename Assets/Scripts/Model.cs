@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Xml;
 using UnityEngine;
 using UnityEngine.XR.WSA;
 using Random = UnityEngine.Random;
@@ -59,6 +60,20 @@ public class Model
             }
         }
         
+        public bool isShipFound(GridSpace[,] map)
+        {
+            for (int x = this.x; x < this.x + size.x; x++)
+            {
+                for (int y = this.y; y < this.y + size.y; y++)
+                {
+                    Debug.Assert(Model.Instance._isInMap(new Vector2Int(x, y)), "Ship has some part not in the map");
+                    if (!map[x, y].hasBeenSelected) return false;
+                }
+            }
+
+            return true;
+        }
+        
     }
     public List<Ship> playerDock = new List<Ship>{new Ship(1,2), new Ship(1,2), new Ship(1,3), new Ship(2,3)};
     public List<Ship> computerDock = new List<Ship>{new Ship(1,2), new Ship(1,2),new Ship(1,3), new Ship(2,3)};
@@ -73,16 +88,15 @@ public class Model
     {
         get
         {
-            var i = 0;
-            foreach (var ship in playerDock)
-                i += ship.x * ship.y;
-            return i;
+            return playerDock.Count;
         }
     }
     
     public GridSpace[,] computerMap = new GridSpace[mapSize.x,mapSize.y], playerMap = new GridSpace[mapSize.x,mapSize.y];
     
     public int capturedPlayerShips = 0, capturedComputerShip = 0;
+    private Vector2Int _lastComputerMovePos = new Vector2Int(-1,-1);
+    private bool _isLastMoveCapturedShip = true;
 
     public void Init()
     {
@@ -117,9 +131,16 @@ public class Model
         if(!_isInMap(pos) || playerMap[pos.x, pos.y].hasBeenSelected) return;
         
         playerMap[pos.x, pos.y].hasBeenSelected = true;
-        if (computerMap[pos.x, pos.y].pieceType == MapPiece.Ship) 
-            capturedComputerShip++;
         
+/*
+        var capturedShip = 0;
+        foreach (var ship in computerDock)
+            if (ship.isShipFound(computerMap)) capturedShip++;
+        if (capturedShip > capturedComputerShip)
+            capturedComputerShip = capturedShip;
+
+*/
+
         isPlayerTurn = !isPlayerTurn;
         if (!isPlayerTurn)
         {
@@ -148,9 +169,28 @@ public class Model
 
     private void _AIMove()
     {
-        var pos = _ramdomUnCheckedPos(computerMap);
-        computerMap[pos.x, pos.y].hasBeenSelected = true;
-        if (playerMap[pos.x, pos.y].pieceType == MapPiece.Ship) capturedPlayerShips++;
+        var move = new Vector2Int();
+        if (_isLastMoveCapturedShip)
+            move = _ramdomUnCheckedPos(computerMap);
+        else
+        {
+            move = _MakeAdjunctMove(_lastComputerMovePos);
+        }
+        computerMap[move.x,move.y].hasBeenSelected = true;
+        
+        
+        var capturedShip = 0;
+        foreach (var ship in playerDock)
+            if (ship.isShipFound(playerMap)) capturedShip++;
+        if (capturedShip > capturedPlayerShips)
+        {
+            capturedPlayerShips = capturedShip;
+            _isLastMoveCapturedShip = true;
+        }
+        else
+            _isLastMoveCapturedShip = false;
+        
+        _lastComputerMovePos = move;
     }
 
     private void _InitComputerBoard()
@@ -330,5 +370,81 @@ public class Model
         var ship = _RandomSelectShip(playerDock, playerMap);
         _SetShipToCertainState(ship,playerMap,MapPiece.PossibleShip);
         return ship;
+    }
+
+    private Vector2Int _MakeAdjunctMove(Vector2Int lastCheckPos)
+    {
+        var possibleMove = _GetPossiblePos(lastCheckPos, computerMap);
+        var betterMove = new Dictionary<Vector2Int,int>();
+        
+        var threshold = 1;
+        foreach (var move in possibleMove)
+        {
+            if (move.Value > threshold)
+            {
+                threshold = move.Value;
+                betterMove.Clear();
+            }
+            if(move.Value == threshold)
+                betterMove.Add(move.Key,move.Value);
+        }
+        
+        var moveList = new List<Vector2Int>();
+        foreach (var move in betterMove)
+            moveList.Add(move.Key);
+        return _Shuffle(moveList)[0];
+    }
+
+    private Dictionary<Vector2Int,int> _GetPossiblePos(Vector2Int lastCheckPos, GridSpace[,] map)
+    {
+        var chunkList = new List<Vector2Int>();
+        chunkList.Add(lastCheckPos);
+        var disActiveAdjunct = new Dictionary<Vector2Int,int>();
+        
+        var newList = new List<Vector2Int>(0);
+        newList.Add(lastCheckPos);
+        while (newList.Count!=0)
+        { 
+            var tempDisActiveAdjunct = new Dictionary<Vector2Int,int>(0);
+            _GetAdjunctInfo(newList,computerMap,chunkList, out newList, out tempDisActiveAdjunct);
+            
+            //record
+            foreach (var pos in newList)
+                chunkList.Add(pos);
+            foreach (var tempPos in tempDisActiveAdjunct)
+            {
+                if (disActiveAdjunct.ContainsKey(tempPos.Key)) disActiveAdjunct[tempPos.Key]++;
+                else disActiveAdjunct.Add(tempPos.Key, 1);
+            }
+        }
+
+        return disActiveAdjunct;
+    }
+
+    private void _GetAdjunctInfo(List<Vector2Int> poses,GridSpace[,] map, List<Vector2Int> oldList, out List<Vector2Int> activePosList, out Dictionary<Vector2Int,int> inactivePosDic)
+    {
+        activePosList = new List<Vector2Int>(0);
+        inactivePosDic = new Dictionary<Vector2Int, int>();
+        foreach (var pos in poses)
+        {
+            for (int x = pos.x - 1; x < pos.x + 2; x++)
+            {
+                for (int y = pos.y - 1; y < pos.y + 2; y++)
+                {
+                    if (x != pos.x && y != pos.y) continue;
+                    if(_isGridAvaliable(pos, map))
+                    {
+                        if (inactivePosDic.ContainsKey(new Vector2Int(x, y))) inactivePosDic[new Vector2Int(x, y)]++;
+                        else inactivePosDic.Add(new Vector2Int(x,y), 1);
+                    }
+                    activePosList.Add(new Vector2Int(x, y));
+                }
+            }
+        }
+
+        for(int i = 0; i < activePosList.Count; i++)
+            if (oldList.Contains(activePosList[i]))
+                activePosList.Remove(activePosList[i]);
+        
     }
 }
