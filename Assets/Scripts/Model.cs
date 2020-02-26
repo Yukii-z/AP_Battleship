@@ -62,9 +62,9 @@ public class Model
         
         public bool isShipFound(GridSpace[,] map)
         {
-            for (int x = this.x; x < this.x + size.x; x++)
+            for (int x = refPos.x; x < refPos.x + size.x; x++)
             {
-                for (int y = this.y; y < this.y + size.y; y++)
+                for (int y = refPos.y; y < refPos.y + size.y; y++)
                 {
                     Debug.Assert(Model.Instance._isInMap(new Vector2Int(x, y)), "Ship has some part not in the map");
                     if (!map[x, y].hasBeenSelected) return false;
@@ -132,14 +132,14 @@ public class Model
         
         playerMap[pos.x, pos.y].hasBeenSelected = true;
         
-/*
+
         var capturedShip = 0;
         foreach (var ship in computerDock)
-            if (ship.isShipFound(computerMap)) capturedShip++;
+            if (ship.isShipFound(playerMap)) capturedShip++;
         if (capturedShip > capturedComputerShip)
             capturedComputerShip = capturedShip;
 
-*/
+
 
         isPlayerTurn = !isPlayerTurn;
         if (!isPlayerTurn)
@@ -148,6 +148,8 @@ public class Model
             isPlayerTurn = !isPlayerTurn;
         }
 
+        View.Instance.DoViewUpdate();
+        
         if (_IsGameEnd())
         {
             //applicationIntegration end
@@ -171,17 +173,18 @@ public class Model
     {
         var move = new Vector2Int();
         if (_isLastMoveCapturedShip)
-            move = _ramdomUnCheckedPos(computerMap);
+            move = _RamdomUnCheckedPos(computerMap);
         else
         {
-            move = _MakeAdjunctMove(_lastComputerMovePos);
+            move = _RamdomUnCheckedPos(computerMap);
+            //move = _MakeAdjunctMove(_lastComputerMovePos);
         }
         computerMap[move.x,move.y].hasBeenSelected = true;
         
         
         var capturedShip = 0;
         foreach (var ship in playerDock)
-            if (ship.isShipFound(playerMap)) capturedShip++;
+            if (ship.isShipFound(computerMap)) capturedShip++;
         if (capturedShip > capturedPlayerShips)
         {
             capturedPlayerShips = capturedShip;
@@ -238,7 +241,7 @@ public class Model
         return true;
     }
 
-    private Vector2Int _ramdomUnCheckedPos(GridSpace[,] checkMap)
+    private Vector2Int _RamdomUnCheckedPos(GridSpace[,] checkMap)
     {
         var x = -1;
         var y = -1;
@@ -342,11 +345,9 @@ public class Model
 
     private Ship _RandomSelectShip(List<Ship> dock, GridSpace[,] map)
     {
-        while (_Shuffle(dock)[0].isBeenSetOnBoard)
-        {
-        }
+        while (_Shuffle(dock)[0].isBeenSetOnBoard){}
 
-        dock[0].refPos = new Vector2Int(-1, -1);
+            dock[0].refPos = new Vector2Int(-1, -1);
         while (!_isShipSetable(dock[0], dock[0].refPos, map))
         {
             dock[0].refPos = new Vector2Int(Random.Range(0, mapSize.x), Random.Range(0, mapSize.y));
