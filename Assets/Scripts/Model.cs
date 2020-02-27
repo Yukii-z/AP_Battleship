@@ -181,8 +181,12 @@ public class Model
             move = _MakeAdjunctMove(_lastComputerMovePos);
         }
         playerMap[move.x,move.y].hasBeenSelected = true;
-        if (playerMap[move.x, move.y].pieceType == MapPiece.Ship) 
+        if (playerMap[move.x, move.y].pieceType == MapPiece.Ship)
+        {
             _isSearchingFocus = true;
+            _lastComputerMovePos = move;
+        } 
+            
         
         var capturedShip = 0;
         foreach (var ship in playerDock)
@@ -192,8 +196,6 @@ public class Model
             capturedPlayerShips = capturedShip;
             _isSearchingFocus = false;
         }
-        
-        _lastComputerMovePos = move;
     }
 
     private void _InitComputerBoard()
@@ -432,14 +434,21 @@ public class Model
             {
                 for (int y = pos.y - 1; y < pos.y + 2; y++)
                 {
-                    if ((x != pos.x && y != pos.y) || !_isInMap(pos)) continue;
+                    if ((x != pos.x && y != pos.y) || (x == pos.x && y == pos.y) || !_isInMap(new Vector2Int(x,y))) continue;
                     if(!map[x,y].hasBeenSelected)
                     {
-                        if (inactivePosDic.ContainsKey(new Vector2Int(x, y))) inactivePosDic[new Vector2Int(x, y)]++;
+                        if (inactivePosDic.ContainsKey(new Vector2Int(x, y))) 
+                            inactivePosDic[new Vector2Int(x, y)] = inactivePosDic[new Vector2Int(x, y)]+1;
                         else inactivePosDic.Add(new Vector2Int(x,y), 1);
+                        continue;
                     }
-                    else
+
+                    if (map[x, y].pieceType == MapPiece.Ship)
+                    {
+                        if (_isBelongToAFoundedShip(new Vector2Int(x, y), playerDock, playerMap) ||
+                            oldList.Contains(new Vector2Int(x, y))) continue;
                         activePosList.Add(new Vector2Int(x, y));
+                    }
                 }
             }
         }
@@ -448,5 +457,16 @@ public class Model
             if (oldList.Contains(activePosList[i]))
                 activePosList.Remove(activePosList[i]);
         
+    }
+
+    private bool _isBelongToAFoundedShip(Vector2Int pos, List<Ship> dock, GridSpace[,] map)
+    {
+        foreach (var ship in dock)
+        {
+            if (ship.isShipFound(map))
+                if ((pos.x >= ship.refPos.x && pos.x < ship.refPos.x + ship.size.x) &&
+                    (pos.y >= ship.refPos.y && pos.y < ship.refPos.y + ship.size.y)) return true;
+        }
+        return false;
     }
 }
