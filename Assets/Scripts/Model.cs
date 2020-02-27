@@ -92,11 +92,12 @@ public class Model
         }
     }
     
+    //computer map is the upper one
     public GridSpace[,] computerMap = new GridSpace[mapSize.x,mapSize.y], playerMap = new GridSpace[mapSize.x,mapSize.y];
     
     public int capturedPlayerShips = 0, capturedComputerShip = 0;
     private Vector2Int _lastComputerMovePos = new Vector2Int(-1,-1);
-    private bool _isLastMoveCapturedShip = true;
+    private bool _isSearchingFocus = false;
 
     public void Init()
     {
@@ -128,14 +129,14 @@ public class Model
     public void DoMapCheck(Vector2Int pos)
     {
         pos.y -= Model.mapSize.y;
-        if(!_isInMap(pos) || playerMap[pos.x, pos.y].hasBeenSelected) return;
+        if(!_isInMap(pos) || computerMap[pos.x, pos.y].hasBeenSelected) return;
         
-        playerMap[pos.x, pos.y].hasBeenSelected = true;
+        computerMap[pos.x, pos.y].hasBeenSelected = true;
         
 
         var capturedShip = 0;
         foreach (var ship in computerDock)
-            if (ship.isShipFound(playerMap)) capturedShip++;
+            if (ship.isShipFound(computerMap)) capturedShip++;
         if (capturedShip > capturedComputerShip)
             capturedComputerShip = capturedShip;
 
@@ -172,26 +173,25 @@ public class Model
     private void _AIMove()
     {
         var move = new Vector2Int();
-        if (_isLastMoveCapturedShip)
-            move = _RamdomUnCheckedPos(computerMap);
+        if (!_isSearchingFocus)
+            move = _RamdomUnCheckedPos(playerMap);
         else
         {
-            move = _RamdomUnCheckedPos(computerMap);
-            //move = _MakeAdjunctMove(_lastComputerMovePos);
+            //move = _RamdomUnCheckedPos(computerMap);
+            move = _MakeAdjunctMove(_lastComputerMovePos);
         }
-        computerMap[move.x,move.y].hasBeenSelected = true;
-        
+        playerMap[move.x,move.y].hasBeenSelected = true;
+        if (playerMap[move.x, move.y].pieceType == MapPiece.Ship) 
+            _isSearchingFocus = true;
         
         var capturedShip = 0;
         foreach (var ship in playerDock)
-            if (ship.isShipFound(computerMap)) capturedShip++;
+            if (ship.isShipFound(playerMap)) capturedShip++;
         if (capturedShip > capturedPlayerShips)
         {
             capturedPlayerShips = capturedShip;
-            _isLastMoveCapturedShip = true;
+            _isSearchingFocus = false;
         }
-        else
-            _isLastMoveCapturedShip = false;
         
         _lastComputerMovePos = move;
     }
@@ -375,7 +375,7 @@ public class Model
 
     private Vector2Int _MakeAdjunctMove(Vector2Int lastCheckPos)
     {
-        var possibleMove = _GetPossiblePos(lastCheckPos, computerMap);
+        var possibleMove = _GetPossiblePos(lastCheckPos, playerMap);
         var betterMove = new Dictionary<Vector2Int,int>();
         
         var threshold = 1;
@@ -407,7 +407,7 @@ public class Model
         while (newList.Count!=0)
         { 
             var tempDisActiveAdjunct = new Dictionary<Vector2Int,int>(0);
-            _GetAdjunctInfo(newList,computerMap,chunkList, out newList, out tempDisActiveAdjunct);
+            _GetAdjunctInfo(newList,map,chunkList, out newList, out tempDisActiveAdjunct);
             
             //record
             foreach (var pos in newList)
@@ -432,13 +432,14 @@ public class Model
             {
                 for (int y = pos.y - 1; y < pos.y + 2; y++)
                 {
-                    if (x != pos.x && y != pos.y) continue;
-                    if(_isGridAvaliable(pos, map))
+                    if ((x != pos.x && y != pos.y) || !_isInMap(pos)) continue;
+                    if(!map[x,y].hasBeenSelected)
                     {
                         if (inactivePosDic.ContainsKey(new Vector2Int(x, y))) inactivePosDic[new Vector2Int(x, y)]++;
                         else inactivePosDic.Add(new Vector2Int(x,y), 1);
                     }
-                    activePosList.Add(new Vector2Int(x, y));
+                    else
+                        activePosList.Add(new Vector2Int(x, y));
                 }
             }
         }

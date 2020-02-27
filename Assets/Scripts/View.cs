@@ -113,7 +113,7 @@ public class View
             {
                 //for PlayerWin board
                 var mapPiece = Model.Instance.computerMap[x, y].pieceType;
-                var checkPiece = Model.Instance.playerMap[x, y].hasBeenSelected;
+                var checkPiece = Model.Instance.computerMap[x, y].hasBeenSelected;
                 if (checkPiece)
                 {
                     var obj = playerPieceObj[x, y];
@@ -125,7 +125,7 @@ public class View
                 
                 //ComputerWin board
                 mapPiece = Model.Instance.playerMap[x, y].pieceType;
-                checkPiece = Model.Instance.computerMap[x, y].hasBeenSelected;
+                checkPiece = Model.Instance.playerMap[x, y].hasBeenSelected;
                 if (checkPiece)
                 {
                     var obj = computerPieceObj[x, y];
