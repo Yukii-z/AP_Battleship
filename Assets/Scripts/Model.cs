@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml;
 using UnityEngine;
-using UnityEngine.XR.WSA;
+using UnityEngine.Networking;
 using Random = UnityEngine.Random;
 
 public class Model
@@ -99,6 +99,17 @@ public class Model
     private Vector2Int _lastComputerMovePos = new Vector2Int(-1,-1);
     private bool _isSearchingFocus = false;
 
+    [Serializable]
+    public struct Position
+    {
+        public Position(int x, int y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+        public int x;
+        public int y;
+    }
     public void Init()
     {
         //init the ship map for PlayerWin
@@ -126,10 +137,10 @@ public class Model
         View.Instance.GameStartViewUpdate();
     }
     
-    public void DoMapCheck(Vector2Int pos)
+    public IEnumerator DoMapCheck(Vector2Int pos)
     {
         pos.y -= Model.mapSize.y;
-        if(!_isInMap(pos) || computerMap[pos.x, pos.y].hasBeenSelected) return;
+        if(!_isInMap(pos) || computerMap[pos.x, pos.y].hasBeenSelected) yield break;
         
         computerMap[pos.x, pos.y].hasBeenSelected = true;
         
@@ -145,7 +156,7 @@ public class Model
         isPlayerTurn = !isPlayerTurn;
         if (!isPlayerTurn)
         {
-            _AIMove();
+            yield return _AIMove();
             isPlayerTurn = !isPlayerTurn;
         }
 
@@ -170,22 +181,22 @@ public class Model
         return false;
     }
 
-    private void _AIMove()
+    private IEnumerator _AIMove()
     {
-        var move = new Vector2Int();
-        if (!_isSearchingFocus)
+        yield return GetMove(URL);
+        /*if (!_isSearchingFocus)
             move = _RamdomUnCheckedPos(playerMap);
         else
         {
             //move = _RamdomUnCheckedPos(computerMap);
-            move = _MakeAdjunctMove(_lastComputerMovePos);
-        }
-        playerMap[move.x,move.y].hasBeenSelected = true;
+            move = _MakeAdjunctMove(_lastComputerMovePos,playerMap,playerDock);
+        }*/
+        /*playerMap[move.x,move.y].hasBeenSelected = true;
         if (playerMap[move.x, move.y].pieceType == MapPiece.Ship)
         {
             _isSearchingFocus = true;
             _lastComputerMovePos = move;
-        } 
+        } */
             
         
         var capturedShip = 0;
@@ -375,9 +386,9 @@ public class Model
         return ship;
     }
 
-    private Vector2Int _MakeAdjunctMove(Vector2Int lastCheckPos)
+    private Vector2Int _MakeAdjunctMove(Vector2Int lastCheckPos,GridSpace[,] map, List<Ship> dock)
     {
-        var possibleMove = _GetPossiblePos(lastCheckPos, playerMap);
+        var possibleMove = _GetPossiblePos(lastCheckPos, map,dock);
         var betterMove = new Dictionary<Vector2Int,int>();
         
         var threshold = 1;
@@ -398,7 +409,7 @@ public class Model
         return _Shuffle(moveList)[0];
     }
 
-    private Dictionary<Vector2Int,int> _GetPossiblePos(Vector2Int lastCheckPos, GridSpace[,] map)
+    private Dictionary<Vector2Int,int> _GetPossiblePos(Vector2Int lastCheckPos, GridSpace[,] map, List<Ship> dock)
     {
         var chunkList = new List<Vector2Int>();
         chunkList.Add(lastCheckPos);
@@ -409,7 +420,7 @@ public class Model
         while (newList.Count!=0)
         { 
             var tempDisActiveAdjunct = new Dictionary<Vector2Int,int>(0);
-            _GetAdjunctInfo(newList,map,chunkList, out newList, out tempDisActiveAdjunct);
+            _GetAdjunctInfo(newList,map, dock,chunkList, out newList, out tempDisActiveAdjunct);
             
             //record
             foreach (var pos in newList)
@@ -424,7 +435,7 @@ public class Model
         return disActiveAdjunct;
     }
 
-    private void _GetAdjunctInfo(List<Vector2Int> poses,GridSpace[,] map, List<Vector2Int> oldList, out List<Vector2Int> activePosList, out Dictionary<Vector2Int,int> inactivePosDic)
+    private void _GetAdjunctInfo(List<Vector2Int> poses,GridSpace[,] map, List<Ship> dock, List<Vector2Int> oldList, out List<Vector2Int> activePosList, out Dictionary<Vector2Int,int> inactivePosDic)
     {
         activePosList = new List<Vector2Int>(0);
         inactivePosDic = new Dictionary<Vector2Int, int>();
@@ -445,7 +456,7 @@ public class Model
 
                     if (map[x, y].pieceType == MapPiece.Ship)
                     {
-                        if (_isBelongToAFoundedShip(new Vector2Int(x, y), playerDock, playerMap) ||
+                        if (_isBelongToAFoundedShip(new Vector2Int(x, y), dock, map) ||
                             oldList.Contains(new Vector2Int(x, y))) continue;
                         activePosList.Add(new Vector2Int(x, y));
                     }
@@ -469,4 +480,41 @@ public class Model
         }
         return false;
     }
+    
+    //URL - "127.0.0.1:3000/" +"?board=" + GetBoardAsString();
+    public string URL
+    {
+        get{return "127.0.0.1:3000/" +"?board=" + GetBoardAsString();}
+    }
+    public string GetBoardAsString() { 
+        var toReturn = "";
+        for (int x = 0; x < mapSize.x; x++)
+        {
+            for (int y = 0; y < mapSize.y; y++)
+            {
+                var isShip = _isBelongToAFoundedShip(new Vector2Int(x, y), playerDock, playerMap);
+                 toReturn += playerMap[x,y].hasBeenSelected.ToString() + "|" + (int) playerMap[x,y].pieceType + "|" + isShip.ToString() +  "-";
+            }
+        }
+        return toReturn;
+    }
+    IEnumerator GetMove(string URL) {
+        UnityWebRequest webRequest = UnityWebRequest.Get(URL);
+        yield return webRequest.SendWebRequest();
+        if (webRequest.isNetworkError || webRequest.isHttpError) {
+            Debug.Log(webRequest.error);
+        }
+        else {
+            var responseObject = JsonUtility.FromJson<Position>(webRequest.downloadHandler.text);
+            var move = new Vector2Int(responseObject.x,responseObject.y);
+            playerMap[move.x,move.y].hasBeenSelected = true;
+            if (playerMap[move.x, move.y].pieceType == MapPiece.Ship)
+            {
+                _isSearchingFocus = true;
+                _lastComputerMovePos = move;
+            } 
+            // interpret response
+        }
+    }
+    
 }

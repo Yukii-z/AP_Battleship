@@ -51,7 +51,7 @@ public class InputSystem
         if (Input.GetMouseButtonDown(0) && Model.Instance.currentState == Model.GameState.OnGoing)
         {
             var attachedMousePos = _attachedMousePos(Input.mousePosition);
-            Model.Instance.DoMapCheck(attachedMousePos);
+            CoroutineManager.DoCoroutine(Model.Instance.DoMapCheck(attachedMousePos));
         }
 
         if (Input.GetKeyDown(KeyCode.R))
